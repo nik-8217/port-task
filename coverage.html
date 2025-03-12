@@ -1,0 +1,587 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>portservice: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">portservice/cmd/portservice/main.go (0.0%)</option>
+				
+				<option value="file1">portservice/internal/adapters/secondary/memory/port_repository.go (96.8%)</option>
+				
+				<option value="file2">portservice/internal/core/port_service.go (84.5%)</option>
+				
+				<option value="file3">portservice/internal/domain/port.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "context"
+        "flag"
+        "log"
+        "os"
+        "os/signal"
+        "syscall"
+        "time"
+
+        "portservice/internal/adapters/secondary/memory"
+        "portservice/internal/core"
+        "portservice/internal/ports/out"
+)
+
+func main() <span class="cov0" title="0">{
+        // Parse command line flags
+        filePath := flag.String("file", "ports.json", "Path to the ports JSON file")
+        flag.Parse()
+
+        // Create repository and service
+        repo := memory.NewPortRepository()
+        service := core.NewPortService(repo)
+
+        // Create context that will be canceled on interrupt
+        ctx, cancel := context.WithCancel(context.Background())
+        defer cancel()
+
+        // Set up signal handling
+        sigChan := make(chan os.Signal, 1)
+        signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+        // Start processing in a goroutine
+        errChan := make(chan error, 1)
+        startTime := time.Now()
+        go func() </span><span class="cov0" title="0">{
+                errChan &lt;- service.ProcessPortsFile(ctx, *filePath)
+        }</span>()
+
+        // Wait for either completion or interruption
+        <span class="cov0" title="0">var err error
+        select </span>{
+        case err = &lt;-errChan:<span class="cov0" title="0">
+                if err == context.Canceled </span><span class="cov0" title="0">{
+                        log.Println("Processing was canceled")
+                }</span> else<span class="cov0" title="0"> if err != nil </span><span class="cov0" title="0">{
+                        log.Printf("Error processing file: %v", err)
+                }</span> else<span class="cov0" title="0"> {
+                        duration := time.Since(startTime)
+                        log.Printf("File processing completed successfully in %v", duration)
+
+                        // Display repository statistics
+                        if stats, ok := repo.(interface{ GetStatistics() out.RepositoryStats }); ok </span><span class="cov0" title="0">{
+                                repoStats := stats.GetStatistics()
+                                log.Printf("Repository statistics:")
+                                log.Printf("  - Total ports processed: %d", repoStats.TotalPorts)
+                                log.Printf("  - Total updates: %d", repoStats.TotalUpdates)
+                                log.Printf("  - Last update: %v", repoStats.LastUpdate)
+                                log.Printf("  - Average processing speed: %.2f ports/second",
+                                        float64(repoStats.TotalPorts)/duration.Seconds())
+                        }</span>
+                }
+        case sig := &lt;-sigChan:<span class="cov0" title="0">
+                log.Printf("Received signal %v, shutting down...", sig)
+                cancel()
+                // Wait for processing to stop or timeout
+                select </span>{
+                case err = &lt;-errChan:<span class="cov0" title="0">
+                        log.Printf("Processing stopped with error: %v", err)</span>
+                case &lt;-time.After(5 * time.Second):<span class="cov0" title="0">
+                        log.Println("Processing shutdown timed out")</span>
+                }
+        }
+
+        // Close repository
+        <span class="cov0" title="0">closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer closeCancel()
+
+        if closeErr := repo.(interface{ Close(context.Context) error }).Close(closeCtx); closeErr != nil </span><span class="cov0" title="0">{
+                log.Printf("Error closing repository: %v", closeErr)
+        }</span>
+
+        <span class="cov0" title="0">if err != nil &amp;&amp; err != context.Canceled </span><span class="cov0" title="0">{
+                os.Exit(1)
+        }</span>
+        <span class="cov0" title="0">log.Println("Service stopped")</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package memory
+
+import (
+        "context"
+        "sync"
+        "sync/atomic"
+        "time"
+
+        "portservice/internal/domain"
+        "portservice/internal/ports/out"
+)
+
+// PortRepository implements out.PortRepository using an in-memory map
+type PortRepository struct {
+        ports map[string]*domain.Port
+        mu    sync.RWMutex
+
+        // Statistics
+        totalPorts     atomic.Int64
+        totalUpdates   atomic.Int64
+        lastUpdateTime atomic.Int64
+}
+
+// NewPortRepository creates a new instance of PortRepository
+func NewPortRepository() out.PortRepository <span class="cov8" title="1">{
+        return &amp;PortRepository{
+                ports: make(map[string]*domain.Port),
+        }
+}</span>
+
+// SavePort saves or updates a port in the repository
+func (r *PortRepository) SavePort(ctx context.Context, port *domain.Port) error <span class="cov8" title="1">{
+        select </span>{
+        case &lt;-ctx.Done():<span class="cov8" title="1">
+                return ctx.Err()</span>
+        default:<span class="cov8" title="1">
+                if err := port.Validate(); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">r.mu.Lock()
+                defer r.mu.Unlock()
+
+                _, exists := r.ports[port.ID]
+                r.ports[port.ID] = port
+
+                // Update statistics
+                if !exists </span><span class="cov8" title="1">{
+                        r.totalPorts.Add(1)
+                }</span>
+                <span class="cov8" title="1">r.totalUpdates.Add(1)
+                r.lastUpdateTime.Store(time.Now().UnixNano())
+
+                return nil</span>
+        }
+}
+
+// GetPort retrieves a port by its ID
+func (r *PortRepository) GetPort(ctx context.Context, id string) (*domain.Port, error) <span class="cov8" title="1">{
+        select </span>{
+        case &lt;-ctx.Done():<span class="cov8" title="1">
+                return nil, ctx.Err()</span>
+        default:<span class="cov8" title="1">
+                r.mu.RLock()
+                defer r.mu.RUnlock()
+
+                if port, exists := r.ports[id]; exists </span><span class="cov8" title="1">{
+                        return port, nil
+                }</span>
+                <span class="cov8" title="1">return nil, nil</span>
+        }
+}
+
+// GetStatistics returns current repository statistics
+func (r *PortRepository) GetStatistics() out.RepositoryStats <span class="cov8" title="1">{
+        lastUpdate := time.Unix(0, r.lastUpdateTime.Load())
+        return out.RepositoryStats{
+                TotalPorts:   r.totalPorts.Load(),
+                TotalUpdates: r.totalUpdates.Load(),
+                LastUpdate:   lastUpdate.Format(time.RFC3339),
+        }
+}</span>
+
+// Close implements the Close method for the repository
+func (r *PortRepository) Close(ctx context.Context) error <span class="cov8" title="1">{
+        select </span>{
+        case &lt;-ctx.Done():<span class="cov8" title="1">
+                return ctx.Err()</span>
+        default:<span class="cov8" title="1">
+                r.mu.Lock()
+                defer r.mu.Unlock()
+
+                // Clear the map to free memory
+                for k := range r.ports </span><span class="cov8" title="1">{
+                        delete(r.ports, k)
+                }</span>
+                <span class="cov8" title="1">r.ports = nil
+                return nil</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package core
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "log"
+        "os"
+
+        "portservice/internal/domain"
+        "portservice/internal/ports/in"
+        "portservice/internal/ports/out"
+)
+
+// portService implements in.PortService
+type portService struct {
+        repository out.PortRepository
+}
+
+// NewPortService creates a new instance of portService
+func NewPortService(repository out.PortRepository) in.PortService <span class="cov8" title="1">{
+        return &amp;portService{
+                repository: repository,
+        }
+}</span>
+
+// CreateOrUpdatePort creates a new port or updates an existing one
+func (s *portService) CreateOrUpdatePort(ctx context.Context, port *domain.Port) error <span class="cov8" title="1">{
+        if ctx.Err() != nil </span><span class="cov8" title="1">{
+                return ctx.Err()
+        }</span>
+        <span class="cov8" title="1">if port == nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("nil port")
+        }</span>
+        <span class="cov8" title="1">if err := port.Validate(); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("invalid port: %w", err)
+        }</span>
+        <span class="cov8" title="1">return s.repository.SavePort(ctx, port)</span>
+}
+
+// GetPort retrieves a port by its ID
+func (s *portService) GetPort(ctx context.Context, id string) (*domain.Port, error) <span class="cov8" title="1">{
+        if ctx.Err() != nil </span><span class="cov8" title="1">{
+                return nil, ctx.Err()
+        }</span>
+        <span class="cov8" title="1">if id == "" </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("empty port ID")
+        }</span>
+        <span class="cov8" title="1">return s.repository.GetPort(ctx, id)</span>
+}
+
+// ProcessPortsFile processes a JSON file containing port data
+func (s *portService) ProcessPortsFile(ctx context.Context, filePath string) error <span class="cov8" title="1">{
+        file, err := os.Open(filePath)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to open file: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer file.Close()
+
+        decoder := json.NewDecoder(file)
+
+        // Read opening brace
+        if _, err := decoder.Token(); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("failed to read JSON start: %w", err)
+        }</span>
+
+        // Read key-value pairs
+        <span class="cov8" title="1">for decoder.More() </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        return ctx.Err()</span>
+                default:<span class="cov8" title="1">
+                        // Read port ID (key)
+                        portID, err := decoder.Token()
+                        if err != nil </span><span class="cov0" title="0">{
+                                if err == io.EOF </span><span class="cov0" title="0">{
+                                        break</span>
+                                }
+                                <span class="cov0" title="0">return fmt.Errorf("failed to read port ID: %w", err)</span>
+                        }
+
+                        // Read port data into map
+                        <span class="cov8" title="1">var portData map[string]interface{}
+                        if err := decoder.Decode(&amp;portData); err != nil </span><span class="cov8" title="1">{
+                                return fmt.Errorf("failed to decode port data: %w", err)
+                        }</span>
+
+                        // Extract and validate required fields
+                        <span class="cov8" title="1">name, ok := portData["name"].(string)
+                        if !ok </span><span class="cov0" title="0">{
+                                log.Printf("Warning: port %v has invalid or missing name", portID)
+                                continue</span>
+                        }
+
+                        // Extract optional fields with defaults
+                        <span class="cov8" title="1">city := getStringOrDefault(portData, "city", "")
+                        country := getStringOrDefault(portData, "country", "")
+                        province := getStringOrDefault(portData, "province", "")
+                        timezone := getStringOrDefault(portData, "timezone", "")
+                        code := getStringOrDefault(portData, "code", "")
+
+                        // Extract and validate coordinates
+                        var coordinates []float64
+                        if coords, ok := portData["coordinates"].([]interface{}); ok &amp;&amp; len(coords) == 2 </span><span class="cov8" title="1">{
+                                lon, lonOk := coords[0].(float64)
+                                lat, latOk := coords[1].(float64)
+                                if !lonOk || !latOk </span><span class="cov0" title="0">{
+                                        log.Printf("Warning: port %v has invalid coordinate types", portID)
+                                        continue</span>
+                                }
+                                <span class="cov8" title="1">if lon &lt; -180 || lon &gt; 180 </span><span class="cov8" title="1">{
+                                        log.Printf("Warning: port %v has invalid longitude: %v", portID, lon)
+                                        continue</span>
+                                }
+                                <span class="cov8" title="1">if lat &lt; -90 || lat &gt; 90 </span><span class="cov0" title="0">{
+                                        log.Printf("Warning: port %v has invalid latitude: %v", portID, lat)
+                                        continue</span>
+                                }
+                                <span class="cov8" title="1">coordinates = []float64{lon, lat}</span>
+                        } else<span class="cov8" title="1"> {
+                                log.Printf("Warning: port %v has invalid coordinates format", portID)
+                                continue</span>
+                        }
+
+                        // Extract unlocs
+                        <span class="cov8" title="1">unlocs := make([]string, 0)
+                        if unlocsRaw, ok := portData["unlocs"].([]interface{}); ok </span><span class="cov8" title="1">{
+                                for _, u := range unlocsRaw </span><span class="cov8" title="1">{
+                                        if s, ok := u.(string); ok </span><span class="cov8" title="1">{
+                                                unlocs = append(unlocs, s)
+                                        }</span>
+                                }
+                        }
+
+                        // Create port entity
+                        <span class="cov8" title="1">port, err := domain.NewPort(
+                                portID.(string),
+                                name,
+                                city,
+                                country,
+                                coordinates,
+                                province,
+                                timezone,
+                                unlocs,
+                                code,
+                        )
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Printf("Warning: failed to create port entity for %v: %v", portID, err)
+                                continue</span>
+                        }
+
+                        // Save port
+                        <span class="cov8" title="1">if err := s.repository.SavePort(ctx, port); err != nil </span><span class="cov8" title="1">{
+                                return fmt.Errorf("failed to save port %v: %w", portID, err)
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// getStringOrDefault safely extracts a string value from a map with a default value
+func getStringOrDefault(data map[string]interface{}, key, defaultValue string) string <span class="cov8" title="1">{
+        if val, ok := data[key].(string); ok </span><span class="cov8" title="1">{
+                return val
+        }</span>
+        <span class="cov8" title="1">return defaultValue</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package domain
+
+import (
+        "errors"
+        "fmt"
+)
+
+// Coordinate represents a geographical coordinate
+type Coordinate struct {
+        Longitude float64
+        Latitude  float64
+}
+
+// NewCoordinate creates a new coordinate with validation
+func NewCoordinate(longitude, latitude float64) (*Coordinate, error) <span class="cov8" title="1">{
+        if longitude &lt; -180 || longitude &gt; 180 </span><span class="cov8" title="1">{
+                return nil, errors.New("longitude must be between -180 and 180")
+        }</span>
+        <span class="cov8" title="1">if latitude &lt; -90 || latitude &gt; 90 </span><span class="cov8" title="1">{
+                return nil, errors.New("latitude must be between -90 and 90")
+        }</span>
+        <span class="cov8" title="1">return &amp;Coordinate{
+                Longitude: longitude,
+                Latitude:  latitude,
+        }, nil</span>
+}
+
+// String returns a string representation of the coordinate
+func (c *Coordinate) String() string <span class="cov8" title="1">{
+        return fmt.Sprintf("[%.6f, %.6f]", c.Longitude, c.Latitude)
+}</span>
+
+// Port represents a port entity in the domain
+type Port struct {
+        ID          string      `json:"id"`
+        Name        string      `json:"name"`
+        City        string      `json:"city"`
+        Country     string      `json:"country"`
+        Coordinates *Coordinate `json:"-"`
+        Province    string      `json:"province"`
+        Timezone    string      `json:"timezone"`
+        Unlocs      []string    `json:"unlocs"`
+        Code        string      `json:"code"`
+}
+
+// NewPort creates a new Port with validation
+func NewPort(id, name, city, country string, coords []float64, province, timezone string, unlocs []string, code string) (*Port, error) <span class="cov8" title="1">{
+        if id == "" </span><span class="cov8" title="1">{
+                return nil, errors.New("port ID cannot be empty")
+        }</span>
+        <span class="cov8" title="1">if name == "" </span><span class="cov8" title="1">{
+                return nil, errors.New("port name cannot be empty")
+        }</span>
+        <span class="cov8" title="1">if len(coords) != 2 </span><span class="cov8" title="1">{
+                return nil, errors.New("coordinates must contain exactly longitude and latitude")
+        }</span>
+
+        <span class="cov8" title="1">coordinate, err := NewCoordinate(coords[0], coords[1])
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("invalid coordinates: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;Port{
+                ID:          id,
+                Name:        name,
+                City:        city,
+                Country:     country,
+                Coordinates: coordinate,
+                Province:    province,
+                Timezone:    timezone,
+                Unlocs:      unlocs,
+                Code:        code,
+        }, nil</span>
+}
+
+// Validate performs domain validation on the port
+func (p *Port) Validate() error <span class="cov8" title="1">{
+        if p.ID == "" </span><span class="cov8" title="1">{
+                return errors.New("port ID cannot be empty")
+        }</span>
+        <span class="cov8" title="1">if p.Name == "" </span><span class="cov8" title="1">{
+                return errors.New("port name cannot be empty")
+        }</span>
+        <span class="cov8" title="1">if p.Coordinates == nil </span><span class="cov8" title="1">{
+                return errors.New("port must have coordinates")
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// String returns a string representation of the port
+func (p *Port) String() string <span class="cov8" title="1">{
+        return fmt.Sprintf("Port{ID: %s, Name: %s, Location: %s, %s}",
+                p.ID, p.Name, p.City, p.Coordinates)
+}</span>
+
+// PortRepository defines the interface for port data persistence
+type PortRepository interface {
+        // SavePort saves or updates a port in the repository
+        SavePort(port *Port) error
+
+        // GetPort retrieves a port by its ID
+        GetPort(id string) (*Port, error)
+}
+
+// PortService defines the interface for port business operations
+type PortService interface {
+        // CreateOrUpdatePort creates a new port or updates an existing one
+        CreateOrUpdatePort(port *Port) error
+
+        // GetPort retrieves a port by its ID
+        GetPort(id string) (*Port, error)
+
+        // ProcessPortsFile processes a JSON file containing port data
+        ProcessPortsFile(filePath string) error
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
